@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import QMessageBox, QWidget, QVBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QHBoxLayout, QDialog
-
-from db import create_connection, Employee, EmployeeEducation, EmployeePosition, EmployeeTraining
-from edit_employee_window import EditEmployeeDialog
-from add_employee_window import AddEmployeeDialog
+from modules import create_connection, Employee, EmployeeEducation, EmployeePosition, Training, EmployeeTraining
 from fpdf import FPDF
 
+from add_training_window import AddTrainingDialog
+from add_employee_window import AddEmployeeDialog
+from edit_employee_window import EditEmployeeDialog
 
 class EmployeeListWindow(QWidget):
     def __init__(self):
@@ -14,10 +14,6 @@ class EmployeeListWindow(QWidget):
         self.setGeometry(100, 100, 1300, 600)
 
         self.layout = QVBoxLayout()
-
-        # Таблица сотрудников
-        self.table = QTableWidget(self)
-        self.layout.addWidget(self.table)
 
         # Кнопки действий
         self.buttons_panel = QHBoxLayout()
@@ -33,11 +29,19 @@ class EmployeeListWindow(QWidget):
         self.delete_button.clicked.connect(self.delete_employee)
         self.buttons_panel.addWidget(self.delete_button)
 
-        self.report_button = QPushButton("Генерировать отчет", self)
-        self.report_button.clicked.connect(self.generate_training_report)
-        self.buttons_panel.addWidget(self.report_button)
-
+        self.report_button1 = QPushButton("Генерировать отчет 1", self)
+        self.report_button1.clicked.connect(self.generate_training_report)
+        self.buttons_panel.addWidget(self.report_button1)
+        
+        self.report_button2 = QPushButton("Генерировать отчет 2", self)
+        self.report_button2.clicked.connect(self.generate_employee_card_report)
+        self.buttons_panel.addWidget(self.report_button2)
+        
         self.layout.addLayout(self.buttons_panel)
+
+         # Таблица сотрудников
+        self.table = QTableWidget(self)
+        self.layout.addWidget(self.table)
 
         self.setLayout(self.layout)
 
@@ -45,7 +49,7 @@ class EmployeeListWindow(QWidget):
         self.load_employees()
         
     def load_employees(self):
-        """Загружаем список сотрудников из базы данных"""
+        # Загружаем список сотрудников из базы данных
         session = create_connection()
         employees = session.query(Employee).filter(Employee.is_deleted == False).all()  # Фильтруем по удаленным
         self.table.setRowCount(len(employees))
@@ -161,10 +165,9 @@ class EmployeeListWindow(QWidget):
         dialog = AddEmployeeDialog(self)
         if dialog.exec() == QDialog.Accepted:
             self.load_employees()  # Обновляем таблицу после добавления сотрудника
-
     
     def show_message(self, title, message, icon=QMessageBox.Information):
-        """Отображает всплывающее сообщение."""
+        # Отображает всплывающее сообщение.
         msg_box = QMessageBox(self)
         msg_box.setIcon(icon)
         msg_box.setWindowTitle(title)
@@ -175,55 +178,65 @@ class EmployeeListWindow(QWidget):
         try:
             session = create_connection()
 
-            # Загружаем список сотрудников, прошедших обучение в определенный период
-            employees = session.query(Employee).filter(Employee.is_deleted == False).all()
+            # Извлечение данных о сотрудниках и их обучении
+            data = (
+                session.query(
+                    Employee.last_name,
+                    Employee.first_name,
+                    Employee.surname,
+                    Training.start_date,
+                    Training.end_date,
+                    Training.name_training,
+                    Training.format_training
+                )
+                .join(EmployeeTraining, Employee.id == EmployeeTraining.employee_id)
+                .join(Training, EmployeeTraining.training_id == Training.id)
+                
+                .filter(Employee.is_deleted == False)
+                .all()
+            )
 
-            # Создаем объект PDF
+            # Создание PDF
             pdf = FPDF()
             pdf.set_auto_page_break(auto=True, margin=15)
             pdf.add_page()
-
-            # Заголовок
+            # Устанавливаем шрифт FreeSans
+            pdf.add_font('FreeSans', '', 'FreeSans.ttf', uni=True)
+            pdf.set_font('FreeSans', '', 16)
+            # Заголовок отчёта
             pdf.set_font('FreeSans', '', 16)
             pdf.cell(200, 10, "Отчет об обучении сотрудников", ln=True, align='C')
             pdf.ln(10)
 
-            total_amount = 0  # Общая сумма
+            total_amount = 0  # Итоговая стоимость обучения
 
-            # Заголовки столбцов
+            # Заполнение данных
             pdf.set_font('FreeSans', '', 12)
-            pdf.cell(60, 10, "ФИО", border=1)
-            pdf.cell(60, 10, "Название курса", border=1)
-            pdf.cell(30, 10, "Дата окончания", border=1)
-            pdf.cell(30, 10, "Стоимость", border=1)
-            pdf.ln()
+            for row in data:
+                last_name, first_name, surname, start, end, name_training, format_training = row
+                training_cost = 0
+                total_amount += training_cost
 
-            # Данные по каждому сотруднику
-            pdf.set_font('FreeSans', '', 12)
-            for employee in employees:
-                # Получаем курсы и обучение для каждого сотрудника
-                training = session.query(EmployeeTraining).filter(EmployeeTraining.employee_id == employee.id).all()
-
-                for t in training:
-                    pdf.cell(60, 10, f"{employee.last_name} {employee.first_name}", border=1)
-                    pdf.cell(60, 10, t.r_training.name_training, border=1)
-                    pdf.cell(30, 10, str(t.end_date), border=1)  # Предполагаем, что у EmployeeTraining есть end_date
-                    pdf.cell(30, 10, f"{t.price:.2f} р.", border=1)
-                    pdf.ln()
-                    total_amount += t.price
+                pdf.cell(200, 10, f"{last_name} {first_name} {surname}", ln=True)
+                pdf.cell(200, 10, f"Период обучения: {start} - {end}", ln=True)
+                pdf.cell(200, 10, f"Курс: {name_training}", ln=True)
+                pdf.cell(200, 10, f"Стоимость: {training_cost:.2f} руб.", ln=True)
+                pdf.ln(5)
 
             # Итоговая сумма
             pdf.ln(10)
             pdf.set_font('FreeSans', '', 14)
-            pdf.cell(0, 10, f"Итого за обучение: {total_amount:.2f} р.", ln=True, align='R')
+            pdf.cell(0, 10, f"Итоговая сумма за обучение всех сотрудников: {total_amount:.2f} р.", ln=True, align='R')
 
-            # Сохраняем PDF
+            # Сохранение PDF
             pdf_output_path = f"./training_report.pdf"
             pdf.output(pdf_output_path)
 
             print(f"Отчет был успешно экспортирован в {pdf_output_path}")
             session.close()
-
+            
+            QMessageBox.information(self, "Успех", f"Отчет был успешно экспортирован в:\n{pdf_output_path}")
+        
         except Exception as e:
             print(f"Произошла ошибка при создании отчета: {str(e)}")
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при создании отчета: {str(e)}")
@@ -235,52 +248,77 @@ class EmployeeListWindow(QWidget):
             # Загружаем сотрудников
             employees = session.query(Employee).filter(Employee.is_deleted == False).all()
 
+            # Создаём общий PDF
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=15)
+            pdf.add_font('FreeSans', '', 'FreeSans.ttf', uni=True)
+
             for employee in employees:
-                # Создаем объект PDF для каждого сотрудника
-                pdf = FPDF()
-                pdf.set_auto_page_break(auto=True, margin=15)
+                # Добавляем новую страницу для каждого сотрудника
                 pdf.add_page()
 
-                # Заголовок
+                # Заголовок карточки сотрудника
                 pdf.set_font('FreeSans', '', 16)
-                pdf.cell(200, 10, f"Карточка сотрудника: {employee.last_name} {employee.first_name}", ln=True, align='C')
+                pdf.cell(200, 10, f"Карточка сотрудника: {employee.last_name} {employee.first_name} {employee.surname}", ln=True, align='C')
                 pdf.ln(10)
 
-                # Информация о сотруднике
+                # Базовая информация о сотруднике
                 pdf.set_font('FreeSans', '', 12)
-                pdf.cell(200, 10, f"ФИО: {employee.last_name} {employee.first_name}", ln=True)
+                pdf.cell(200, 10, f"ФИО: {employee.last_name} {employee.first_name} {employee.surname or ''}", ln=True)
+                pdf.cell(200, 10, f"Телефон: {employee.phone_number or 'Не указан'}", ln=True)
+                pdf.cell(200, 10, f"Дата рождения: {employee.birth_date}", ln=True)
+                pdf.cell(200, 10, f"СНИЛС: {employee.snils}", ln=True)
+                pdf.cell(200, 10, f"ИНН: {employee.inn}", ln=True)
+                pdf.cell(200, 10, f"Паспорт: {employee.passport}", ln=True)
+                pdf.cell(200, 10, f"Стаж работы: {employee.work_experience}", ln=True)
+                pdf.cell(200, 10, f"Семейное положение: {employee.material_status}", ln=True)
+                pdf.cell(200, 10, f"Дата приёма на работу: {employee.hire_date}", ln=True)
+                pdf.cell(200, 10, f"Дата увольнения: {employee.dismissal_date or 'Не уволен'}", ln=True)
+                pdf.ln(5)
 
-                # Должность
+                # Должность сотрудника
                 position = session.query(EmployeePosition).filter(EmployeePosition.employee_id == employee.id).first()
                 if position:
                     pdf.cell(200, 10, f"Должность: {position.r_position.name_position}", ln=True)
-                    pdf.cell(200, 10, f"Отдел: {position.department}", ln=True)
+                    pdf.cell(200, 10, f"Отдел: {position.department or 'Не указан'}", ln=True)
+                else:
+                    pdf.cell(200, 10, "Должность: Не указана", ln=True)
+
+                pdf.ln(5)
 
                 # Образование
-                education = session.query(EmployeeEducation).filter(EmployeeEducation.employee_id == employee.id).first()
+                education = session.query(EmployeeEducation).filter(EmployeeEducation.employee_id == employee.id).all()
+                pdf.cell(200, 10, "Образование:", ln=True)
                 if education:
-                    pdf.cell(200, 10, f"Образование: {education.r_education.level_education}", ln=True)
+                    for edu in education:
+                        pdf.cell(200, 10, f"- {edu.r_education.level_education} ({edu.r_education.issue_date})", ln=True)
                 else:
-                    pdf.cell(200, 10, "Образование: Не указано", ln=True)
+                    pdf.cell(200, 10, "Нет данных об образовании", ln=True)
+
+                pdf.ln(5)
 
                 # Курсы обучения
-                training_list = session.query(EmployeeTraining).filter(EmployeeTraining.employee_id == employee.id).all()
                 pdf.cell(200, 10, "Пройденные курсы:", ln=True)
-
+                training_list = session.query(EmployeeTraining).filter(EmployeeTraining.employee_id == employee.id).all()
                 if training_list:
                     for t in training_list:
-                        pdf.cell(200, 10, f"{t.r_training.name_training} - {str(t.end_date)}", ln=True)
+                        training_name = t.r_training.name_training or "Неизвестный курс"
+                        start_date = t.r_training.start_date or "Не указана"
+                        end_date = t.r_training.end_date or "Не указана"
+                        pdf.cell(200, 10, f"- {training_name}: {start_date} - {end_date}", ln=True)
                 else:
                     pdf.cell(200, 10, "Нет пройденных курсов", ln=True)
 
-                # Сохраняем PDF для каждого сотрудника
-                pdf_output_path = f"./employee_card_{employee.id}.pdf"
-                pdf.output(pdf_output_path)
+            # Сохранение единого PDF
+            pdf_output_path = "./all_employee_cards.pdf"
+            pdf.output(pdf_output_path)
 
-                print(f"Карточка сотрудника была успешно экспортирована в {pdf_output_path}.")
-
+            print(f"Карточки сотрудников были успешно экспортированы в {pdf_output_path}.")
             session.close()
+
+            QMessageBox.information(self, "Успех", f"Отчет был успешно экспортирован в:\n{pdf_output_path}")
 
         except Exception as e:
             print(f"Произошла ошибка при создании карточки сотрудника: {str(e)}")
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при создании карточки сотрудника: {str(e)}")
+        

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QComboBox, QDateEdit, QDialogButtonBox
-from PySide6.QtCore import QDate
-from db import create_connection, Employee, PositionEmployee, Education, EmployeeEducation, EmployeePosition
+from PySide6.QtCore import Qt, QDate
+from modules import create_connection, Employee, Position, Education, EmployeeEducation, EmployeePosition
 from PySide6.QtCore import QDate
 
 
@@ -44,7 +44,7 @@ class AddEmployeeDialog(QDialog):
 
         # Заполняем комбобоксы должностей и отделов
         session = create_connection()
-        positions = session.query(PositionEmployee).all()  # Используем Position вместо position
+        positions = session.query(Position).all()
         for position in positions:
             self.position_combo.addItem(position.name_position, position.id)  # Получаем должность
 

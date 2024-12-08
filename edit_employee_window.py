@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QComboBox, QDateEdit, QDialogButtonBox
+from PySide6.QtCore import Qt, QDate
+from modules import create_connection, Employee
 from PySide6.QtCore import QDate
-from db import create_connection, Employee
-from PySide6.QtCore import QDate
+
 
 class EditEmployeeDialog(QDialog):
     def __init__(self, employee_id, parent=None):
@@ -91,3 +92,4 @@ class EditEmployeeDialog(QDialog):
         session.commit()
         session.close()
         self.accept()
+
