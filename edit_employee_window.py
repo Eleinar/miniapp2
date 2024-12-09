@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QComboBox, QDateEdit, QDialogButtonBox
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import QDate
 from modules import create_connection, Employee
 from PySide6.QtCore import QDate
 

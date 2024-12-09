@@ -29,11 +29,11 @@ class EmployeeListWindow(QWidget):
         self.delete_button.clicked.connect(self.delete_employee)
         self.buttons_panel.addWidget(self.delete_button)
 
-        self.report_button1 = QPushButton("Генерировать отчет 1", self)
+        self.report_button1 = QPushButton("Документ 1", self)
         self.report_button1.clicked.connect(self.generate_training_report)
         self.buttons_panel.addWidget(self.report_button1)
         
-        self.report_button2 = QPushButton("Генерировать отчет 2", self)
+        self.report_button2 = QPushButton("Документ 2", self)
         self.report_button2.clicked.connect(self.generate_employee_card_report)
         self.buttons_panel.addWidget(self.report_button2)
         
